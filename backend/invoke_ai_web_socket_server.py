@@ -24,7 +24,7 @@ opt = Args()
 args = opt.parse_args()
 
 
-class InvokeAIWebServer:
+class InvokeAIWebSocketServer:
     def __init__(self, generate, gfpgan, codeformer, esrgan) -> None:
         self.host = args.host
         self.port = args.port

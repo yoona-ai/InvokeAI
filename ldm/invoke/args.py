@@ -113,11 +113,12 @@ PRECISION_CHOICES = [
 ]
 
 # is there a way to pick this up during git commits?
-APP_ID      = 'lstein/stable-diffusion'
+APP_ID = 'lstein/stable-diffusion'
 APP_VERSION = 'v1.15'
 
+
 class ArgFormatter(argparse.RawTextHelpFormatter):
-        # use defined argument order to display usage
+    # use defined argument order to display usage
     def _format_usage(self, usage, actions, groups, prefix):
         if prefix is None:
             prefix = 'usage: '
@@ -130,34 +131,37 @@ class ArgFormatter(argparse.RawTextHelpFormatter):
         elif usage is None and not actions:
             usage = 'invoke>'
         elif usage is None:
-            prog='invoke>'
+            prog = 'invoke>'
             # build full usage string
-            action_usage = self._format_actions_usage(actions, groups) # NEW
+            action_usage = self._format_actions_usage(actions, groups)  # NEW
             usage = ' '.join([s for s in [prog, action_usage] if s])
             # omit the long line wrapping code
         # prefix with 'usage:'
         return '%s%s\n\n' % (prefix, usage)
 
+
 class PagingArgumentParser(argparse.ArgumentParser):
     '''
     A custom ArgumentParser that uses pydoc to page its output.
     '''
+
     def print_help(self, file=None):
         text = self.format_help()
         pydoc.pager(text)
-    
+
+
 class Args(object):
-    def __init__(self,arg_parser=None,cmd_parser=None):
+    def __init__(self, arg_parser=None, cmd_parser=None):
         '''
         Initialize new Args class. It takes two optional arguments, an argparse
         parser for switches given on the shell command line, and an argparse
         parser for switches given on the invoke> CLI line. If one or both are
         missing, it creates appropriate parsers internally.
         '''
-        self._arg_parser   = arg_parser or self._create_arg_parser()
-        self._cmd_parser   = cmd_parser or self._create_dream_cmd_parser()
-        self._arg_switches = self.parse_cmd('')   # fill in defaults
-        self._cmd_switches = self.parse_cmd('')   # fill in defaults
+        self._arg_parser = arg_parser or self._create_arg_parser()
+        self._cmd_parser = cmd_parser or self._create_dream_cmd_parser()
+        self._arg_switches = self.parse_cmd('')  # fill in defaults
+        self._cmd_switches = self.parse_cmd('')  # fill in defaults
 
     def parse_args(self):
         '''Parse the shell switches and store.'''
@@ -167,7 +171,15 @@ class Args(object):
         except:
             return None
 
-    def parse_cmd(self,cmd_string):
+    def parse_known_args(self):
+        '''Parse the shell switches and store.'''
+        try:
+            self._arg_switches = self._arg_parser.parse_known_args()
+            return self._arg_switches[0]
+        except:
+            return None
+
+    def parse_cmd(self, cmd_string):
         '''Parse a invoke>-style command string '''
         command = cmd_string.replace("'", "\\'")
         try:
@@ -194,10 +206,10 @@ class Args(object):
         except:
             return None
 
-    def json(self,**kwargs):
+    def json(self, **kwargs):
         return json.dumps(self.to_dict(**kwargs))
 
-    def to_dict(self,**kwargs):
+    def to_dict(self, **kwargs):
         a = vars(self)
         a.update(kwargs)
         return a
@@ -205,7 +217,7 @@ class Args(object):
     # Isn't there a more automated way of doing this?
     # Ideally we get the switch strings out of the argparse objects,
     # but I don't see a documented API for this.
-    def dream_prompt_str(self,**kwargs):
+    def dream_prompt_str(self, **kwargs):
         """Normalized dream_prompt."""
         a = vars(self)
         a.update(kwargs)
@@ -228,16 +240,16 @@ class Args(object):
             switches.append('--hires_fix')
 
         # img2img generations have parameters relevant only to them and have special handling
-        if a['init_img'] and len(a['init_img'])>0:
+        if a['init_img'] and len(a['init_img']) > 0:
             switches.append(f'-I {a["init_img"]}')
             switches.append(f'-A {a["sampler_name"]}')
             if a['fit']:
                 switches.append(f'--fit')
-            if a['init_mask'] and len(a['init_mask'])>0:
+            if a['init_mask'] and len(a['init_mask']) > 0:
                 switches.append(f'-M {a["init_mask"]}')
-            if a['init_color'] and len(a['init_color'])>0:
+            if a['init_color'] and len(a['init_color']) > 0:
                 switches.append(f'--init_color {a["init_color"]}')
-            if a['strength'] and a['strength']>0:
+            if a['strength'] and a['strength'] > 0:
                 switches.append(f'-f {a["strength"]}')
             if a['inpaint_replace']:
                 switches.append(f'--inpaint_replace')
@@ -272,14 +284,14 @@ class Args(object):
         # 1. Variations come out of the stored metadata as a packed string with the keyword "variations"
         # 2. However, they come out of the CLI (and probably web) with the keyword "with_variations" and
         #    in broken-out form. Variation (1) should be changed to comply with (2)
-        if a['with_variations'] and len(a['with_variations'])>0:
+        if a['with_variations'] and len(a['with_variations']) > 0:
             formatted_variations = ','.join(f'{seed}:{weight}' for seed, weight in (a["with_variations"]))
             switches.append(f'-V {formatted_variations}')
-        if 'variations' in a and len(a['variations'])>0:
+        if 'variations' in a and len(a['variations']) > 0:
             switches.append(f'-V {a["variations"]}')
         return ' '.join(switches)
 
-    def __getattribute__(self,name):
+    def __getattribute__(self, name):
         '''
         Returns union of command-line arguments and dream_prompt arguments,
         with the latter superseding the former.
@@ -287,31 +299,31 @@ class Args(object):
         cmd_switches = None
         arg_switches = None
         try:
-            cmd_switches = object.__getattribute__(self,'_cmd_switches')
-            arg_switches = object.__getattribute__(self,'_arg_switches')
+            cmd_switches = object.__getattribute__(self, '_cmd_switches')
+            arg_switches = object.__getattribute__(self, '_arg_switches')
         except AttributeError:
             pass
 
-        if cmd_switches and arg_switches and name=='__dict__':
+        if cmd_switches and arg_switches and name == '__dict__':
             return self._merge_dict(
                 arg_switches.__dict__,
                 cmd_switches.__dict__,
             )
         try:
-            return object.__getattribute__(self,name)
+            return object.__getattribute__(self, name)
         except AttributeError:
             pass
 
-        if not hasattr(cmd_switches,name) and not hasattr(arg_switches,name):
+        if not hasattr(cmd_switches, name) and not hasattr(arg_switches, name):
             raise AttributeError
-        
-        value_arg,value_cmd = (None,None)
+
+        value_arg, value_cmd = (None, None)
         try:
-            value_cmd = getattr(cmd_switches,name)
+            value_cmd = getattr(cmd_switches, name)
         except AttributeError:
             pass
         try:
-            value_arg = getattr(arg_switches,name)
+            value_arg = getattr(arg_switches, name)
         except AttributeError:
             pass
 
@@ -319,24 +331,24 @@ class Args(object):
         # default behavior is to choose the dream_command value over
         # the arg value. For example, the --grid and --individual options are a little
         # funny because of their push/pull relationship. This is how to handle it.
-        if name=='grid':
+        if name == 'grid':
             if cmd_switches.individual:
                 return False
             else:
                 return value_cmd or value_arg
         return value_cmd if value_cmd is not None else value_arg
 
-    def __setattr__(self,name,value):
+    def __setattr__(self, name, value):
         if name.startswith('_'):
-            object.__setattr__(self,name,value)
+            object.__setattr__(self, name, value)
         else:
             self._cmd_switches.__dict__[name] = value
 
-    def _merge_dict(self,dict1,dict2):
-        new_dict  = {}
-        for k in set(list(dict1.keys())+list(dict2.keys())):
-            value1 = dict1.get(k,None)
-            value2 = dict2.get(k,None)
+    def _merge_dict(self, dict1, dict2):
+        new_dict = {}
+        for k in set(list(dict1.keys()) + list(dict2.keys())):
+            value1 = dict1.get(k, None)
+            value2 = dict2.get(k, None)
             new_dict[k] = value2 if value2 is not None else value1
         return new_dict
 
@@ -349,22 +361,24 @@ class Args(object):
             description=
             """
             Generate images using Stable Diffusion.
-            Use --web to launch the web interface. 
+            Use --web_socket to launch the web interface with socket_io
+            Use --web_api to generate a simple flask app that serves a minimum of web endpoints with authentication 
             Use --from_file to load prompts from a file path or standard input ("-").
             Otherwise you will be dropped into an interactive command prompt (type -h for help.)
             Other command-line arguments are defaults that can usually be overridden
             prompt the command prompt.
             """,
         )
-        model_group      = parser.add_argument_group('Model selection')
-        file_group       = parser.add_argument_group('Input/output')
+
+        model_group = parser.add_argument_group('Model selection')
+        file_group = parser.add_argument_group('Input/output')
         web_server_group = parser.add_argument_group('Web server')
-        render_group     = parser.add_argument_group('Rendering')
-        postprocessing_group     = parser.add_argument_group('Postprocessing')
+        render_group = parser.add_argument_group('Rendering')
+        postprocessing_group = parser.add_argument_group('Postprocessing')
         deprecated_group = parser.add_argument_group('Deprecated options')
 
         deprecated_group.add_argument('--laion400m')
-        deprecated_group.add_argument('--weights') # deprecated
+        deprecated_group.add_argument('--weights')  # deprecated
         model_group.add_argument(
             '--conf',
             '-c',
@@ -379,10 +393,10 @@ class Args(object):
             help='Indicates which diffusion model to load. (currently "stable-diffusion-1.4" (default) or "laion400m")',
         )
         model_group.add_argument(
-            '--png_compression','-z',
+            '--png_compression', '-z',
             type=int,
             default=6,
-            choices=range(0,9),
+            choices=range(0, 9),
             dest='png_compression',
             help='level of PNG compression, from 0 (none) to 9 (maximum). Default is 6.'
         )
@@ -481,10 +495,16 @@ class Args(object):
             help='Indicates the directory containing the GFPGAN code.',
         )
         web_server_group.add_argument(
-            '--web',
-            dest='web',
+            '--web_socket',
+            dest='web_socket',
             action='store_true',
-            help='Start in web server mode.',
+            help='Start in web server socket io mode.',
+        )
+        web_server_group.add_argument(
+            '--web_api',
+            dest='web_api',
+            action='store_true',
+            help='Start in web server api mode.',
         )
         web_server_group.add_argument(
             '--web_develop',
@@ -546,11 +566,11 @@ class Args(object):
             !NN retrieves the NNth command from the history
             """
         )
-        render_group     = parser.add_argument_group('General rendering')
-        img2img_group    = parser.add_argument_group('Image-to-image and inpainting')
-        variation_group  = parser.add_argument_group('Creating and combining variations')
-        postprocessing_group   = parser.add_argument_group('Post-processing')
-        special_effects_group  = parser.add_argument_group('Special effects')
+        render_group = parser.add_argument_group('General rendering')
+        img2img_group = parser.add_argument_group('Image-to-image and inpainting')
+        variation_group = parser.add_argument_group('Creating and combining variations')
+        postprocessing_group = parser.add_argument_group('Post-processing')
+        special_effects_group = parser.add_argument_group('Special effects')
         render_group.add_argument('prompt')
         render_group.add_argument(
             '-s',
@@ -658,10 +678,10 @@ class Args(object):
             help='Save every nth intermediate image into an "intermediates" directory within the output directory'
         )
         render_group.add_argument(
-            '--png_compression','-z',
+            '--png_compression', '-z',
             type=int,
             default=6,
-            choices=range(0,10),
+            choices=range(0, 10),
             dest='png_compression',
             help='level of PNG compression, from 0 (none) to 9 (maximum). Default is 6.'
         )
@@ -709,7 +729,7 @@ class Args(object):
             '--outcrop',
             nargs='+',
             type=str,
-            metavar=('direction','pixels'),
+            metavar=('direction', 'pixels'),
             help='Outcrop the image with one or more direction/pixel pairs: -c top 64 bottom 128 left 64 right 64',
         )
         img2img_group.add_argument(
@@ -792,9 +812,11 @@ class Args(object):
         )
         return parser
 
+
 def format_metadata(**kwargs):
     print(f'format_metadata() is deprecated. Please use metadata_dumps()')
     return metadata_dumps(kwargs)
+
 
 def metadata_dumps(opt,
                    seeds=[],
@@ -810,58 +832,59 @@ def metadata_dumps(opt,
 
     # top-level metadata minus `image` or `images`
     metadata = {
-        'model'       : 'stable diffusion',
-        'model_id'    : opt.model,
-        'model_hash'  : model_hash,
-        'app_id'      : APP_ID,
-        'app_version' : APP_VERSION,
+        'model': 'stable diffusion',
+        'model_id': opt.model,
+        'model_hash': model_hash,
+        'app_id': APP_ID,
+        'app_version': APP_VERSION,
     }
 
     # # add some RFC266 fields that are generated internally, and not as
     # # user args
     image_dict = opt.to_dict(
-         postprocessing=postprocessing
+        postprocessing=postprocessing
     )
 
     # remove any image keys not mentioned in RFC #266
-    rfc266_img_fields = ['type','postprocessing','sampler','prompt','seed','variations','steps',
-                         'cfg_scale','threshold','perlin','step_number','width','height','extra','strength',
-                         'init_img','init_mask']
+    rfc266_img_fields = ['type', 'postprocessing', 'sampler', 'prompt', 'seed', 'variations', 'steps',
+                         'cfg_scale', 'threshold', 'perlin', 'step_number', 'width', 'height', 'extra', 'strength',
+                         'init_img', 'init_mask']
 
-    rfc_dict ={}
+    rfc_dict = {}
 
     for item in image_dict.items():
-        key,value = item
+        key, value = item
         if key in rfc266_img_fields:
             rfc_dict[key] = value
 
     # semantic drift
-    rfc_dict['sampler']  = image_dict.get('sampler_name',None)
+    rfc_dict['sampler'] = image_dict.get('sampler_name', None)
 
     # display weighted subprompts (liable to change)
     if opt.prompt:
         subprompts = split_weighted_subprompts(opt.prompt)
-        subprompts = [{'prompt':x[0],'weight':x[1]} for x in subprompts]
+        subprompts = [{'prompt': x[0], 'weight': x[1]} for x in subprompts]
         rfc_dict['prompt'] = subprompts
 
     # 'variations' should always exist and be an array, empty or consisting of {'seed': seed, 'weight': weight} pairs
-    rfc_dict['variations'] = [{'seed':x[0],'weight':x[1]} for x in opt.with_variations] if opt.with_variations else []
+    rfc_dict['variations'] = [{'seed': x[0], 'weight': x[1]} for x in
+                              opt.with_variations] if opt.with_variations else []
 
     # if variations are present then we need to replace 'seed' with 'orig_seed'
-    if hasattr(opt,'first_seed'):
+    if hasattr(opt, 'first_seed'):
         rfc_dict['seed'] = opt.first_seed
 
     if opt.init_img:
-        rfc_dict['type']            = 'img2img'
-        rfc_dict['strength_steps']  = rfc_dict.pop('strength')
-        rfc_dict['orig_hash']       = calculate_init_img_hash(opt.init_img)
+        rfc_dict['type'] = 'img2img'
+        rfc_dict['strength_steps'] = rfc_dict.pop('strength')
+        rfc_dict['orig_hash'] = calculate_init_img_hash(opt.init_img)
         rfc_dict['inpaint_replace'] = opt.inpaint_replace
     else:
-        rfc_dict['type']  = 'txt2img'
+        rfc_dict['type'] = 'txt2img'
         rfc_dict.pop('strength')
 
-    if len(seeds)==0 and opt.seed:
-        seeds=[seed]
+    if len(seeds) == 0 and opt.seed:
+        seeds = [seed]
 
     if opt.grid:
         images = []
@@ -877,6 +900,7 @@ def metadata_dumps(opt,
 
     return metadata
 
+
 @functools.lru_cache(maxsize=50)
 def metadata_from_png(png_file_path) -> Args:
     '''
@@ -885,14 +909,16 @@ def metadata_from_png(png_file_path) -> Args:
     returns a single Args object, not multiple.
     '''
     meta = ldm.invoke.pngwriter.retrieve_metadata(png_file_path)
-    if 'sd-metadata' in meta and len(meta['sd-metadata'])>0 :
+    if 'sd-metadata' in meta and len(meta['sd-metadata']) > 0:
         return metadata_loads(meta)[0]
     else:
-        return legacy_metadata_load(meta,png_file_path)
+        return legacy_metadata_load(meta, png_file_path)
+
 
 def dream_cmd_from_png(png_file_path):
     opt = metadata_from_png(png_file_path)
     return opt.dream_prompt_str()
+
 
 def metadata_loads(metadata) -> list:
     '''
@@ -910,29 +936,31 @@ def metadata_loads(metadata) -> list:
         for image in images:
             # repack the prompt and variations
             if 'prompt' in image:
-                image['prompt']     = ','.join([':'.join([x['prompt'],   str(x['weight'])]) for x in image['prompt']])
+                image['prompt'] = ','.join([':'.join([x['prompt'], str(x['weight'])]) for x in image['prompt']])
             if 'variations' in image:
-                image['variations'] = ','.join([':'.join([str(x['seed']),str(x['weight'])]) for x in image['variations']])
+                image['variations'] = ','.join(
+                    [':'.join([str(x['seed']), str(x['weight'])]) for x in image['variations']])
             # fix a bit of semantic drift here
-            image['sampler_name']=image.pop('sampler')
+            image['sampler_name'] = image.pop('sampler')
             opt = Args()
             opt._cmd_switches = Namespace(**image)
             results.append(opt)
     except KeyError as e:
         import sys, traceback
-        print('>> badly-formatted metadata',file=sys.stderr)
+        print('>> badly-formatted metadata', file=sys.stderr)
         print(traceback.format_exc(), file=sys.stderr)
     return results
+
 
 # image can either be a file path on disk or a base64-encoded
 # representation of the file's contents
 def calculate_init_img_hash(image_string):
     prefix = 'data:image/png;base64,'
-    hash   = None
+    hash = None
     if image_string.startswith(prefix):
         imagebase64 = image_string[len(prefix):]
-        imagedata   = base64.b64decode(imagebase64)
-        with open('outputs/test.png','wb') as file:
+        imagedata = base64.b64decode(imagebase64)
+        with open('outputs/test.png', 'wb') as file:
             file.write(imagedata)
         sha = hashlib.sha256()
         sha.update(imagedata)
@@ -941,10 +969,11 @@ def calculate_init_img_hash(image_string):
         hash = sha256(image_string)
     return hash
 
+
 # Bah. This should be moved somewhere else...
 def sha256(path):
     sha = hashlib.sha256()
-    with open(path,'rb') as f:
+    with open(path, 'rb') as f:
         while True:
             data = f.read(65536)
             if not data:
@@ -952,18 +981,18 @@ def sha256(path):
             sha.update(data)
     return sha.hexdigest()
 
-def legacy_metadata_load(meta,pathname) -> Args:
+
+def legacy_metadata_load(meta, pathname) -> Args:
     if 'Dream' in meta and len(meta['Dream']) > 0:
         dream_prompt = meta['Dream']
         opt = Args()
         opt.parse_cmd(dream_prompt)
         return opt
-    else:               # if nothing else, we can get the seed
-        match = re.search('\d+\.(\d+)',pathname)
+    else:  # if nothing else, we can get the seed
+        match = re.search('\d+\.(\d+)', pathname)
         if match:
             seed = match.groups()[0]
             opt = Args()
             opt.seed = seed
             return opt
     return None
-            
