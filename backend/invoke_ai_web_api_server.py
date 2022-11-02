@@ -99,7 +99,7 @@ class InvokeAIWebAPIServer:
             else:
                 return "S3Adapter not configured properly", 500
 
-        self.app.run()
+        self.app.run(host='0.0.0.0', port='8080')
 
     def setup_app(self):
         self.result_url = 'outputs/'
