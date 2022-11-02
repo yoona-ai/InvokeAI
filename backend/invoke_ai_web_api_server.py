@@ -16,6 +16,9 @@ from backend.storage_adapter import S3Adapter
 opt = Args()
 args = opt.parse_args()
 
+ACCEPTED_ENVIRONMENT_HEADERS = ['local', 'staging', 'production']
+MIN_STEPS = 1
+MAX_STEPS = 50
 
 class InvokeAIWebAPIServer:
     def __init__(self, generate, gfpgan, codeformer, esrgan) -> None:
@@ -28,11 +31,15 @@ class InvokeAIWebAPIServer:
         self.codeformer = codeformer
         self.esrgan = esrgan
 
-        self.export_path = None
-
     def run(self):
         self.setup_app()
         self.setup_flask()
+
+    def _check_auth_token(self):
+        return os.getenv('INVOKE_AUTH_TOKEN') == flask_request.headers.get('X-API-KEY')
+
+    def _check_environment_header(self):
+        return flask_request.headers.get('X-ENVIRONMENT') in ACCEPTED_ENVIRONMENT_HEADERS
 
     def setup_flask(self):
         # Socket IO
@@ -40,14 +47,31 @@ class InvokeAIWebAPIServer:
 
         # Base Route
         @self.app.route('/images/', methods=['POST'])
-        def serve():
-            # TODO JHILL: minimal error checking of supplied data?
-            # TODO JHILL: what if no prompt?
+        def images():
+            if not self._check_auth_token():
+                return "No Auth", 401
+
+            if not self._check_environment_header():
+                return f"Specify X-ENVIRONMENT from {ACCEPTED_ENVIRONMENT_HEADERS} in headers", 400
+
+            if not flask_request.json.get('prompt'):
+                print("prompt:", flask_request.json.get('prompt'))
+                return "'prompt' must be supplied in POST", 400
+
+            # TODO JHILL: turn this back on
+            # try:
+            #     steps = int(flask_request.json.get('steps', 1))
+            #     if steps < MIN_STEPS or steps > MAX_STEPS:
+            #         return f"'steps' must be between {MIN_STEPS} and {MAX_STEPS}", 400
+            # except ValueError:
+            #     return "'steps' not a valid integer", 400
+
+            steps = 1
 
             generation_parameters = {
-                'steps': int(flask_request.json.get('steps', 1)),
+                'steps': steps,
                 'prompt': flask_request.json.get('prompt'),
-                'sampler_name': 'k_lms'
+                'sampler_name': flask_request.json.get('sampler_name', 'k_lms')
             }
 
             esrgan_parameters = {
@@ -58,12 +82,22 @@ class InvokeAIWebAPIServer:
 
             }
 
-            path = self.generate_images(generation_parameters, esrgan_parameters, gfpgan_parameters)
-            image_url = S3Adapter().store_from_local_file(path, user_id=flask_request.json['user_id'])
+            path, metadata = self.generate_images(generation_parameters, esrgan_parameters, gfpgan_parameters)
 
-            return {
-                'image_url': image_url
-            }
+            s3_adapter = S3Adapter(flask_request.headers.get('X-ENVIRONMENT'))
+            if s3_adapter.is_valid():
+                image_url, metadata_url = s3_adapter.store_from_local_file(
+                    path,
+                    metadata,
+                    user_id=flask_request.json['user_id'])
+
+                return {
+                    'image_url': image_url,
+                    'metadata_url': metadata_url,
+                    'metadata': metadata
+                }
+            else:
+                return "S3Adapter not configured properly", 500
 
         self.app.run()
 
@@ -131,11 +165,16 @@ class InvokeAIWebAPIServer:
                     generation_parameters['init_mask']
                 )
 
+            export_path = None
+            metadata = None
+
             def image_done(image, seed, first_seed):
                 nonlocal generation_parameters
                 nonlocal esrgan_parameters
                 nonlocal gfpgan_parameters
                 nonlocal prior_variations
+                nonlocal export_path
+                nonlocal metadata
 
                 all_parameters = generation_parameters
                 postprocessing = False
@@ -195,24 +234,21 @@ class InvokeAIWebAPIServer:
 
                 command = parameters_to_command(all_parameters)
 
-                path = self.save_result_image(
+                export_path = self.save_result_image(
                     image,
                     command,
                     metadata,
                     self.result_path,
                     postprocessing=postprocessing,
                 )
-
-                print(f'>> Image generated: "{path}"')
-                self.write_log_message(f'[Generated] "{path}": {command}')
-                self.export_path = path
+                metadata = metadata
 
             self.generate.prompt2image(
                 **generation_parameters,
                 image_callback=image_done,
             )
 
-            return self.export_path
+            return export_path, metadata
 
         except KeyboardInterrupt:
             raise
