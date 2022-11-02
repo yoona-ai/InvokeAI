@@ -36,7 +36,7 @@ class InvokeAIWebAPIServer:
         self.setup_flask()
 
     def _check_auth_token(self):
-        return os.getenv('INVOKE_AUTH_TOKEN') == flask_request.headers.get('X-API-KEY')
+        return os.getenv('STABLE_DIFFUSION_AUTH_TOKEN') == flask_request.headers.get('X-API-KEY')
 
     def _check_environment_header(self):
         return flask_request.headers.get('X-ENVIRONMENT') in ACCEPTED_ENVIRONMENT_HEADERS
@@ -66,7 +66,7 @@ class InvokeAIWebAPIServer:
             # except ValueError:
             #     return "'steps' not a valid integer", 400
 
-            steps = 1
+            steps = 50
 
             generation_parameters = {
                 'steps': steps,
@@ -99,7 +99,7 @@ class InvokeAIWebAPIServer:
             else:
                 return "S3Adapter not configured properly", 500
 
-        self.app.run(host='0.0.0.0', port='8080')
+        self.app.run(host=self.host, port=self.port)
 
     def setup_app(self):
         self.result_url = 'outputs/'
